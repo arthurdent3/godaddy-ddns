@@ -79,36 +79,17 @@ def main():
     msg = 'Hostname "{}" is not a fully-qualified host name of form "HOST.DOMAIN.TOP".'.format(args.hostname)
     raise Exception(msg)
   
-  if not args.ip:
-    try:
-      with urlopen("http://ipv4.icanhazip.com/") as f: resp=f.read()
-      if sys.version_info > (3,): resp = resp.decode('utf-8')
-      args.ip = resp.strip()
-    except URLError:
-      msg = 'Unable to automatically obtain IP address from http://ipv4.icanhazip.com/.'
-      raise Exception(msg)
-  
-  ips = args.ip.split('.')
-  if len(ips)!=4 or \
-    not ips[0].isdigit() or not ips[1].isdigit() or not ips[2].isdigit() or not ips[3].isdigit() or \
-    int(ips[0])>255 or int(ips[1])>255 or int(ips[2])>255 or int(ips[3])>255:
-    msg = '"{}" is not valid IP address.'.format(args.ip)
-    raise Exception(msg)
-
-  url = 'https://api.godaddy.com/v1/domains/{}/records/A/{}'.format('.'.join(hostnames[1:]),hostnames[0])
-  data = json.dumps([ { "data": args.ip, "ttl": args.ttl, "name": hostnames[0], "type": "A" } ])
-  if sys.version_info > (3,):  data = data.encode('utf-8')
-  req = Request(url, method='PUT', data=data)
-
+  # Get the current IP on GoDaddy.
+  c_url = 'https://api.godaddy.com/v1/domains/{}/records/A/{}'.format('.'.join(hostnames[1:]),hostnames[0])
+  req = Request(c_url, method='GET')
   req.add_header("Content-Type","application/json")
   req.add_header("Accept","application/json")
   if args.key and args.secret:
     req.add_header("Authorization", "sso-key {}:{}".format(args.key,args.secret))
-  
   try:
     with urlopen(req) as f: resp = f.read()
     if sys.version_info > (3,):  resp = resp.decode('utf-8')
-    resp = json.loads(resp)
+    current_record = json.loads(resp)[0]
   except HTTPError(e):
     if e.code==400:
       msg = 'Unable to set IP address: GoDaddy API URL ({}) was malformed.'.format(req.full_url)
@@ -135,7 +116,66 @@ Correct values can be obtained from from https://developer.godaddy.com/keys/ and
     msg = 'Unable to set IP address: GoDaddy API failure because "{}".'.format(e.reason)
     raise Exception(msg)
   
-  print('IP address for {} set to {}.'.format(args.hostname,args.ip))
+  if not args.ip:
+    try:
+      with urlopen("http://ipv4.icanhazip.com/") as f: resp=f.read()
+      if sys.version_info > (3,): resp = resp.decode('utf-8')
+      args.ip = resp.strip()
+    except URLError:
+      msg = 'Unable to automatically obtain IP address from http://ipv4.icanhazip.com/.'
+      raise Exception(msg)
+
+  ips = args.ip.split('.')
+  if len(ips)!=4 or \
+    not ips[0].isdigit() or not ips[1].isdigit() or not ips[2].isdigit() or not ips[3].isdigit() or \
+    int(ips[0])>255 or int(ips[1])>255 or int(ips[2])>255 or int(ips[3])>255:
+    msg = '"{}" is not valid IP address.'.format(args.ip)
+    raise Exception(msg)
+  
+  if args.ip == current_record['data']:
+    print("No need to update IP's match. Godaddy has {} current IP is {}".format(current_record['data'],args.ip))
+  else:
+    url = 'https://api.godaddy.com/v1/domains/{}/records/A/{}'.format('.'.join(hostnames[1:]),hostnames[0])   
+    data = json.dumps([ { "data": args.ip, "ttl": args.ttl, "name": hostnames[0], "type": "A" } ])
+    if sys.version_info > (3,):  data = data.encode('utf-8')
+    req = Request(url, method='PUT', data=data)
+
+    req.add_header("Content-Type","application/json")
+    req.add_header("Accept","application/json")
+    if args.key and args.secret:
+      req.add_header("Authorization", "sso-key {}:{}".format(args.key,args.secret))
+    
+    try:
+      with urlopen(req) as f: resp = f.read()
+      if sys.version_info > (3,):  resp = resp.decode('utf-8')
+      resp = json.loads(resp)
+    except HTTPError(e):
+      if e.code==400:
+        msg = 'Unable to set IP address: GoDaddy API URL ({}) was malformed.'.format(req.full_url)
+      elif e.code==401:
+        if args.key and args.secret:
+          msg = '''Unable to set IP address: --key or --secret option incorrect.
+  Correct values can be obtained from from https://developer.godaddy.com/keys/ and are ideally placed in a % file.'''
+        else:
+          msg = '''Unable to set IP address: --key or --secret option missing.
+  Correct values can be obtained from from https://developer.godaddy.com/keys/ and are ideally placed in a % file.'''
+      elif e.code==403:
+          msg = '''Unable to set IP address: customer identified by --key and --secret options denied permission.
+  Correct values can be obtained from from https://developer.godaddy.com/keys/ and are ideally placed in a % file.'''
+      elif e.code==404:
+          msg = 'Unable to set IP address: {} not found at GoDaddy.'.format(args.hostname)
+      elif e.code==422:
+          msg = 'Unable to set IP address: "{}" has invalid domain or lacks A record.'.format(args.hostname)
+      elif e.code==429:
+          msg = 'Unable to set IP address: too many requests to GoDaddy within brief period.'
+      else:
+        msg = 'Unable to set IP address: GoDaddy API failure because "{}".'.format(e.reason)
+      raise Exception(msg)
+    except URLError(e):
+      msg = 'Unable to set IP address: GoDaddy API failure because "{}".'.format(e.reason)
+      raise Exception(msg)
+    
+    print('IP address for {} set to {}.'.format(args.hostname,args.ip))
   
 if __name__ == '__main__':
   main()
