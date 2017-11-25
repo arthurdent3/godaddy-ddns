@@ -92,28 +92,28 @@ def main():
     current_record = json.loads(resp)[0]
   except HTTPError(e):
     if e.code==400:
-      msg = 'Unable to set IP address: GoDaddy API URL ({}) was malformed.'.format(req.full_url)
+      msg = 'Unable to get A Record: GoDaddy API URL ({}) was malformed.'.format(req.full_url)
     elif e.code==401:
       if args.key and args.secret:
-        msg = '''Unable to set IP address: --key or --secret option incorrect.
+        msg = '''Unable to get A Record: --key or --secret option incorrect.
 Correct values can be obtained from from https://developer.godaddy.com/keys/ and are ideally placed in a % file.'''
       else:
-        msg = '''Unable to set IP address: --key or --secret option missing.
+        msg = '''Unable to get A Record: --key or --secret option missing.
 Correct values can be obtained from from https://developer.godaddy.com/keys/ and are ideally placed in a % file.'''
     elif e.code==403:
-        msg = '''Unable to set IP address: customer identified by --key and --secret options denied permission.
+        msg = '''Unable to get A Record: customer identified by --key and --secret options denied permission.
 Correct values can be obtained from from https://developer.godaddy.com/keys/ and are ideally placed in a % file.'''
     elif e.code==404:
-        msg = 'Unable to set IP address: {} not found at GoDaddy.'.format(args.hostname)
+        msg = 'Unable to get A Record: {} not found at GoDaddy.'.format(args.hostname)
     elif e.code==422:
-        msg = 'Unable to set IP address: "{}" has invalid domain or lacks A record.'.format(args.hostname)
+        msg = 'Unable to get A Record: "{}" has invalid domain or lacks A record.'.format(args.hostname)
     elif e.code==429:
-        msg = 'Unable to set IP address: too many requests to GoDaddy within brief period.'
+        msg = 'Unable to get A Record: too many requests to GoDaddy within brief period.'
     else:
-      msg = 'Unable to set IP address: GoDaddy API failure because "{}".'.format(e.reason)
+      msg = 'Unable to get A Record: GoDaddy API failure because "{}".'.format(e.reason)
     raise Exception(msg)
   except URLError(e):
-    msg = 'Unable to set IP address: GoDaddy API failure because "{}".'.format(e.reason)
+    msg = 'Unable to get A Record: GoDaddy API failure because "{}".'.format(e.reason)
     raise Exception(msg)
   
   if not args.ip:
